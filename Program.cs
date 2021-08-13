@@ -302,64 +302,34 @@ namespace DNWS
             _threadModel = Program.Configuration["ThreadModel"];
             _poolSize = Convert.ToInt32(Program.Configuration["ThreadPoolSize"]);
             _parent.Log("Thread Model is: " + _threadModel);
-            if (_threadModel is "Single")
+            while (true)
             {
-                while (true)
+                try
                 {
-                    try
+                    // Wait for client
+                    clientSocket = serverSocket.Accept();
+                    // Get one, show some info
+                    _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
+                    HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
+                    if (_threadModel is "Single")
                     {
-                        // Wait for client
-                        clientSocket = serverSocket.Accept();
-                        // Get one, show some info
-                        _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
-                        HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
                         hp.Process();
                     }
-                    catch (Exception ex)
+                    else if (_threadModel is "Multi")
                     {
-                        _parent.Log("Server starting error: " + ex.Message + "\n" + ex.StackTrace);
-                    }
-                }
-            }
-            else if (_threadModel is "Multi")
-            {
-                while (true)
-                {
-                    try
-                    {
-                        // Wait for client
-                        clientSocket = serverSocket.Accept();
-                        // Get one, show some info
-                        _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
-                        HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
                         Thread t = new Thread(() => hp.Process());
                         t.Start();
                     }
-                    catch (Exception ex)
+                    else if (_threadModel is "Pool")
                     {
-                        _parent.Log("Server starting error: " + ex.Message + "\n" + ex.StackTrace);
+                        ThreadPool.SetMaxThreads(_poolSize, _poolSize);
+                        TaskInfo ti = new TaskInfo(hp);
+                        ThreadPool.QueueUserWorkItem(ProcessPool, ti);
                     }
                 }
-            }
-            else if (_threadModel is "Pool")
-            {
-                ThreadPool.SetMaxThreads(_poolSize, _poolSize);
-                while (true)
+            catch (Exception ex)
                 {
-                    try
-                    {
-                        // Wait for client
-                        clientSocket = serverSocket.Accept();
-                        // Get one, show some info
-                        _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
-                        HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
-                        TaskInfo ti = new TaskInfo(hp);
-                        ThreadPool.QueueUserWorkItem(ProcessPool,ti);
-                    }
-                    catch (Exception ex)
-                    {
-                        _parent.Log("Server starting error: " + ex.Message + "\n" + ex.StackTrace);
-                    }
+                    _parent.Log("Server starting error: " + ex.Message + "\n" + ex.StackTrace);
                 }
             }
         }
